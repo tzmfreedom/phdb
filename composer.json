@@ -1,0 +1,15 @@
+{
+    "name": "makoto.tajitsu/php_simple_debugger",
+    "authors": [
+        {
+            "name": "tzmfreedom",
+            "email": "makoto_tajitsu@hotmail.co.jp"
+        }
+    ],
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "src/": "\\PHPSimpleDebugger"
+        }
+    }
+}
