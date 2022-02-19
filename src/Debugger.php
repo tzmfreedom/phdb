@@ -4,7 +4,6 @@ namespace PHPSimpleDebugger;
 
 class Debugger
 {
-    private int $transaction_id;
     private bool $debug;
 
     /**
@@ -12,7 +11,6 @@ class Debugger
      */
     function __construct(bool $debug = false)
     {
-        $this->transaction_id = 1;
         $this->debug = $debug;
     }
 
@@ -28,31 +26,43 @@ class Debugger
         }
 
         while (true) {
-            while ($conn = stream_socket_accept($socket, -1)) {
-                $this->getMessages($conn); // get initial
-                $this->sendCommand($conn, "stdout");
-                $this->getMessages($conn); // get strem
-                $this->sendCommand($conn, "step");
+            while ($res = stream_socket_accept($socket, -1)) {
+                $conn = new Connection($res, $this->debug);
+                $conn->getMessages();
+                $conn->sendCommand("stdout");
+                $conn->getMessages();
 
+//                $conn->sendCommand("breakpoint_set $file $lineno");
+//                $conn->getMessages();
+
+                $conn->sendCommand("continue");
                 while(true) {
-                    $messages = $this->getMessages($conn);
+                    $messages = $conn->getMessages();
                     foreach ($messages as $xml) {
-                        $response = Response::createFromXML($xml);
-                        if (isset($response['status']) && $response['status'] == 'stopping') {
-                            break 2;
+                        $response = Message::createFromXML($xml);
+                        if ($response::class === ResponseMessage::class) {
+                            if ($response->status === 'stopping') {
+                                break 2;
+                            }
                         }
                         $this->handleResponse($response);
-                        if ($response['_type'] === 'stream') {
+                        if ($response::class === StreamMessage::class) {
                             continue;
                         }
-                        $input = readline(">> ");
-                        if ($input == "exit") {
-                            break 2;
+                        while(true) {
+                            $input = readline(">> ");
+                            if ($input === "exit") {
+                                break 3;
+                            }
+                            if ($input === '') {
+                                continue;
+                            }
+                            $conn->sendCommand($input);
+                            break;
                         }
-                        $this->sendCommand($conn, $input);
                     }
                 }
-                fclose($conn);
+                $conn->close();
             }
         }
 
@@ -60,59 +70,33 @@ class Debugger
     }
 
     /**
-     * @param resource $conn
-     * @return array
+     * @param InitMessage|StreamMessage|ResponseMessage|null $message
      */
-    private function getMessages($conn): array
+    private function handleResponse(InitMessage|StreamMessage|ResponseMessage|null $message)
     {
-        $message = "";
-        while (true) {
-            $chunk = stream_socket_recvfrom($conn, 1024, 0);
-            $message .= $chunk;
-            $len = strlen($message);
-            if ($message[$len - 1] == "\0") {
-                break;
-            }
+        if ($message === null) {
+            return;
         }
-        if ($this->debug) {
-            echo $message;
-        }
-        $messages = explode("\0", $message);
-        $ret = [];
-        foreach ($messages as $m) {
-            if (strpos($m, '<?xml') === 0) {
-                $ret[] = $m;
-            }
-        }
-        return $ret;
-    }
-
-    /**
-     * @param array $obj
-     */
-    private function handleResponse(array $obj)
-    {
-        switch($obj["_type"]){
-            case 'init':
-                // $file = $obj['fileuri'];
-                // $lineno = $obj['lineno'];
+//        var_dump($message);
+        switch($message::class){
+            case InitMessage::class:
                 return;
-            case 'stream':
-                echo $obj['body'] . PHP_EOL;
+            case StreamMessage::class:
+                echo $message->body;
                 break;
-            case 'response':
-                if (isset($obj['property'])) {
-                    echo $obj['property']['body'] . PHP_EOL;
+            case ResponseMessage::class:
+                if (isset($message->property)) {
+                    var_dump($message->property);
                 }
-                if (isset($obj['xdebug:message'])) {
-                    $file = $obj['xdebug:message']['filename'];
-                    $lineno = $obj['xdebug:message']['lineno'];
+                if (!empty($message->lineno)) {
+                    $lineno = $message->lineno;
+                    $file = $message->filename;
+                    if (!empty($file)) {
+                        echo "$file at $lineno\n";
+                        $this->showFile($file, (int)$lineno);
+                    }
                     break;
                 }
-        }
-        if (isset($file) && $file !== '') {
-            echo "$file at $lineno\n";
-            $this->showFile($file, (int)$lineno);
         }
     }
 
@@ -124,56 +108,28 @@ class Debugger
     {
         $fp = fopen($file, 'r');
         $size = 15;
-        $cnt = $lineno < 7 ? 0 : $lineno - 7;
-        $current = 1;
-        while ($cnt > 0) {
+        $current = 0;
+        $cnt = $lineno < 8 ? 0 : $lineno - 8;
+        for ($i = 0; $i < $cnt; $i++) {
             fgets($fp);
-            $cnt--;
             $current++;
         }
-        while ($line = fgets($fp)) {
-            if ($current == $lineno) {
-                echo ">> $line";
-            } else {
-                echo "   $line";
-            }
-            $size--;
+        $max = $lineno + 7;
+        $width = strlen((string)$max);
+        for ($i = 0; $i < $size; $i++) {
+            $line = fgets($fp);
             $current++;
-            if ($size == 0) {
-                break;
+            if ($line) {
+                $formatLine = sprintf("%0{$width}d", $current);
+                if ($current === $lineno) {
+                    echo ">> $formatLine: $line";
+                } else {
+                    echo "   $formatLine: $line";
+                }
             }
         }
         fclose($fp);
     }
 
-    /**
-     * @param $conn
-     * @param string $input
-     */
-    private function sendCommand($conn, string $input)
-    {
-        if (in_array($input, ["n", "next"])) {
-            $command = "step_over -i $this->transaction_id";
-        } else if (in_array($input, ["c", "continue"])) {
-            $command = "run -i $$this->transaction_id";
-        } else if (in_array($input, ["s", "step"])) {
-            $command = "step_into -i $$this->transaction_id";
-        } else if (in_array($input, ["status"])) {
-            $command = "status -i $$this->transaction_id";
-        } else if (in_array($input, ["source"])) {
-            $command = "source -i $$this->transaction_id";
-        } else if (in_array($input, ["stdout"])) {
-            $command = "stdout -i $$this->transaction_id -c 1";
-        } else if (in_array($input, ["w", "whereami"])) {
-            return;
-        } else {
-            $b64encoded = base64_encode($input);
-            $command = "eval -i $$this->transaction_id -- ${b64encoded}";
-        }
-
-        stream_socket_sendto($conn, "${command}\0");
-
-        $this->transaction_id++;
-    }
 }
 
