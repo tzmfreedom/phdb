@@ -12,6 +12,7 @@ class Debugger
     private Logger $logger;
 
     /**
+     * @param Config $config
      * @param bool $debug
      */
     function __construct(public Config $config, bool $debug = false)
@@ -47,32 +48,31 @@ class Debugger
     private function handleConnection(Connection $conn)
     {
         try {
+            // handle init
             $this->handleMessages($conn);
 
-            $this->sendCommand($conn, 'stdout');
-            $this->handleMessages($conn);
-
-            foreach ($this->config->initCommands as $command) {
-                $this->sendCommand($conn, $command);
+            if ($this->sendCommand($conn, 'stdout')) {
                 $this->handleMessages($conn);
             }
 
-            $this->sendCommand($conn, 'continue');
-            $this->handleMessages($conn);
+            foreach ($this->config->initCommands as $command) {
+                if ($this->sendCommand($conn, $command)) {
+                    $this->handleMessages($conn);
+                }
+            }
+
+            if ($this->sendCommand($conn, 'continue')) {
+                $this->handleMessages($conn);
+            }
 
             while(true) {
                 $input = readline(">> ");
                 if ($input === "exit") {
                     throw new StoppingException();
                 }
-                $command = $conn->getCommand($input);
-                if ($command->isValid()) {
-                    $this->logger->debug($command);
-                } else {
-                    continue;
+                if ($this->sendCommand($conn, $input)) {
+                    $this->handleMessages($conn);
                 }
-                $conn->sendCommand($command);
-                $this->handleMessages($conn);
             }
         } catch (StoppingException $e) {
             // pass
@@ -99,12 +99,13 @@ class Debugger
     /**
      * @param Connection $conn
      * @param string $input
+     * @return bool
      */
-    private function sendCommand(Connection $conn, string $input)
+    private function sendCommand(Connection $conn, string $input): bool
     {
         $command = $conn->getCommand($input);
         $this->logger->debug((string)$command);
-        $conn->sendCommand($command);
+        return $conn->sendCommand($command);
     }
 
     /**

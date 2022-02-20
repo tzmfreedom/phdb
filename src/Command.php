@@ -6,12 +6,18 @@ class Command
 {
     private string $commandString;
 
+    /**
+     * @param string $input
+     * @param int $transaction_id
+     */
     function __construct(string $input, int $transaction_id)
     {
         $this->commandString = $this->getCommandString($input, $transaction_id);
     }
 
     /**
+     * @param string $input
+     * @param int $transaction_id
      * @return string
      */
     private function getCommandString(string $input, int $transaction_id): string
@@ -66,6 +72,9 @@ class Command
         return $this->commandString !== '';
     }
 
+    /**
+     * @return string
+     */
     public function __toString(): string
     {
         return $this->commandString;

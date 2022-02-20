@@ -10,6 +10,9 @@ abstract class Message
 
     public abstract function isStopping(): bool;
 
+    /**
+     * @param string $original
+     */
     function __construct(public string $original)
     {
     }

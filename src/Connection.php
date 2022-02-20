@@ -6,6 +6,9 @@ class Connection
 {
     private int $transaction_id;
 
+    /**
+     * @param $conn
+     */
     function __construct(public $conn) {
         $this->transaction_id = 1;
     }
@@ -48,14 +51,16 @@ class Connection
 
     /**
      * @param Command $command
+     * @return bool
      */
-    public function sendCommand(Command $command)
+    public function sendCommand(Command $command): bool
     {
         if (!$command->isValid()) {
-            return;
+            return false;
         }
         stream_socket_sendto($this->conn, "${command}\0");
         $this->transaction_id++;
+        return true;
     }
 
     public function close()

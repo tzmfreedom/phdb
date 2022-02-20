@@ -8,6 +8,9 @@ class StreamMessage extends Message
     private string $encoding;
     private string $body;
 
+    /**
+     * @param string $message
+     */
     function __construct(public string $message)
     {
         $dom = new \DOMDocument();
@@ -33,6 +36,9 @@ class StreamMessage extends Message
         parent::__construct($message);
     }
 
+    /**
+     * @return string
+     */
     public function format(): string
     {
         if ($this->encoding === 'base64') {

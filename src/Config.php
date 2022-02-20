@@ -9,6 +9,9 @@ class Config
      */
     public array $initCommands = [];
 
+    /**
+     * @param string $file
+     */
     public function __construct(string $file)
     {
         $content = file_get_contents($file);

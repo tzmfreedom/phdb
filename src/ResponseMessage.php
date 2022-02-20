@@ -12,6 +12,9 @@ class ResponseMessage extends Message
     public string $transaction_id = '';
     public string $body = '';
 
+    /**
+     * @param string $message
+     */
     public function __construct(string $message)
     {
         $dom = new \DOMDocument();
