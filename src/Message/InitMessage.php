@@ -1,6 +1,6 @@
 <?php
 
-namespace PHPSimpleDebugger;
+namespace PHPSimpleDebugger\Message;
 
 class InitMessage extends Message
 {

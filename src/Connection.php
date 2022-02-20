@@ -2,6 +2,8 @@
 
 namespace PHPSimpleDebugger;
 
+use PHPSimpleDebugger\Message\Message;
+
 class Connection
 {
     private int $transaction_id;
