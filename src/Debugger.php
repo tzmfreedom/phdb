@@ -2,16 +2,25 @@
 
 namespace PHPSimpleDebugger;
 
+use Monolog\Formatter\LineFormatter;
+use Monolog\Handler\NullHandler;
+use Monolog\Handler\StreamHandler;
+use Monolog\Logger;
+
 class Debugger
 {
-    private bool $debug;
+    private Logger $logger;
 
     /**
-     * @param false|bool $debug
+     * @param bool $debug
      */
-    function __construct(bool $debug = false)
+    function __construct(public Config $config, bool $debug = false)
     {
-        $this->debug = $debug;
+        $level = $debug ? Logger::DEBUG : Logger::INFO;
+        $handler = (new StreamHandler('php://stdout', $level))
+            ->setFormatter(new LineFormatter('[%datetime%] %level_name%: %message%' . PHP_EOL));
+        $logger = (new Logger('debugger'))->pushHandler($handler);
+        $this->logger = $logger;
     }
 
     /**
@@ -25,111 +34,92 @@ class Debugger
             die('Could not create socket');
         }
 
-        while (true) {
-            while ($res = stream_socket_accept($socket, -1)) {
-                $conn = new Connection($res, $this->debug);
-                $conn->getMessages();
-                $conn->sendCommand("stdout");
-                $conn->getMessages();
-
-//                $conn->sendCommand("breakpoint_set $file $lineno");
-//                $conn->getMessages();
-
-                $conn->sendCommand("continue");
-                while(true) {
-                    $messages = $conn->getMessages();
-                    foreach ($messages as $xml) {
-                        $response = Message::createFromXML($xml);
-                        if ($response::class === ResponseMessage::class) {
-                            if ($response->status === 'stopping') {
-                                break 2;
-                            }
-                        }
-                        $this->handleResponse($response);
-                        if ($response::class === StreamMessage::class) {
-                            continue;
-                        }
-                        while(true) {
-                            $input = readline(">> ");
-                            if ($input === "exit") {
-                                break 3;
-                            }
-                            if ($input === '') {
-                                continue;
-                            }
-                            $conn->sendCommand($input);
-                            break;
-                        }
-                    }
-                }
-                $conn->close();
-            }
+        while ($res = stream_socket_accept($socket, -1)) {
+            $conn = new Connection($res);
+            $this->handleConnection($conn);
         }
-
         fclose($socket);
     }
 
     /**
-     * @param InitMessage|StreamMessage|ResponseMessage|null $message
+     * @param Connection $conn
      */
-    private function handleResponse(InitMessage|StreamMessage|ResponseMessage|null $message)
+    private function handleConnection(Connection $conn)
     {
-        if ($message === null) {
-            return;
-        }
-//        var_dump($message);
-        switch($message::class){
-            case InitMessage::class:
-                return;
-            case StreamMessage::class:
-                echo $message->body;
-                break;
-            case ResponseMessage::class:
-                if (isset($message->property)) {
-                    var_dump($message->property);
+        try {
+            $this->handleMessages($conn);
+
+            $this->sendCommand($conn, 'stdout');
+            $this->handleMessages($conn);
+
+            foreach ($this->config->initCommands as $command) {
+                $this->sendCommand($conn, $command);
+                $this->handleMessages($conn);
+            }
+
+            $this->sendCommand($conn, 'continue');
+            $this->handleMessages($conn);
+
+            while(true) {
+                $input = readline(">> ");
+                if ($input === "exit") {
+                    throw new StoppingException();
                 }
-                if (!empty($message->lineno)) {
-                    $lineno = $message->lineno;
-                    $file = $message->filename;
-                    if (!empty($file)) {
-                        echo "$file at $lineno\n";
-                        $this->showFile($file, (int)$lineno);
-                    }
-                    break;
+                $command = $conn->getCommand($input);
+                if ($command->isValid()) {
+                    $this->logger->debug($command);
+                } else {
+                    continue;
                 }
+                $conn->sendCommand($command);
+                $this->handleMessages($conn);
+            }
+        } catch (StoppingException $e) {
+            // pass
+        } finally {
+            $conn->close();
         }
     }
 
     /**
-     * @param string $file
-     * @param int $lineno
+     * @param Message $message
+     * @throws StoppingException
      */
-    private function showFile(string $file, int $lineno)
+    private function handleMessage(Message $message)
     {
-        $fp = fopen($file, 'r');
-        $size = 15;
-        $current = 0;
-        $cnt = $lineno < 8 ? 0 : $lineno - 8;
-        for ($i = 0; $i < $cnt; $i++) {
-            fgets($fp);
-            $current++;
+        if ($message->isStopping()) {
+            throw new StoppingException();
         }
-        $max = $lineno + 7;
-        $width = strlen((string)$max);
-        for ($i = 0; $i < $size; $i++) {
-            $line = fgets($fp);
-            $current++;
-            if ($line) {
-                $formatLine = sprintf("%0{$width}d", $current);
-                if ($current === $lineno) {
-                    echo ">> $formatLine: $line";
-                } else {
-                    echo "   $formatLine: $line";
-                }
-            }
+        $output = $message->format();
+        if (!empty($output)) {
+            echo $output . PHP_EOL;
         }
-        fclose($fp);
     }
 
+    /**
+     * @param Connection $conn
+     * @param string $input
+     */
+    private function sendCommand(Connection $conn, string $input)
+    {
+        $command = $conn->getCommand($input);
+        $this->logger->debug((string)$command);
+        $conn->sendCommand($command);
+    }
+
+    /**
+     * @param Connection $conn
+     * @throws StoppingException
+     */
+    private function handleMessages(Connection $conn)
+    {
+        $messages = $conn->getMessages();
+        $this->logger->debug(implode("\n", array_map(function(Message $message): string {
+            return $message->getOriginalResponse();
+        }, $messages)));
+        foreach ($messages as $message) {
+            $this->handleMessage($message);
+        }
+    }
 }
 

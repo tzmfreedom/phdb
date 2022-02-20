@@ -2,20 +2,58 @@
 
 namespace PHPSimpleDebugger;
 
-class StreamMessage
+class StreamMessage extends Message
 {
-    public string $body;
-    public string $type;
-    public string $encoding;
+    private string $type;
+    private string $encoding;
+    private string $body;
 
-    function __construct(string $type, string $encoding, string $body)
+    function __construct(public string $message)
     {
-        $this->type = $type;
-        $this->encoding = $encoding;
-        if ($this->encoding === 'base64') {
-            $this->body = base64_decode($body);
-        } else {
-            $this->body = $body;
+        $dom = new \DOMDocument();
+        $dom->loadXML($message);
+        $stream = $dom->getElementsByTagName('stream');
+        if ($stream->length !== 0) {
+            $type = '';
+            $encoding = '';
+            foreach ($stream[0]->attributes as $attribute) {
+                switch ($attribute->name) {
+                    case 'type':
+                        $type = $attribute->value;
+                        break;
+                    case 'encoding':
+                        $encoding = $attribute->value;
+                        break;
+                }
+            }
+            $this->type = $type;
+            $this->encoding = $encoding;
+            $this->body = $stream[0]->nodeValue;
         }
+        parent::__construct($message);
+    }
+
+    public function format(): string
+    {
+        if ($this->encoding === 'base64') {
+            return base64_decode($this->body);
+        }
+        return $this->body;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSkipped(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isStopping(): bool
+    {
+        return false;
     }
 }

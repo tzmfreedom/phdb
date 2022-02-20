@@ -6,10 +6,7 @@ class Connection
 {
     private int $transaction_id;
 
-    function __construct(
-        public $conn,
-        public $debug
-    ) {
+    function __construct(public $conn) {
         $this->transaction_id = 1;
     }
 
@@ -18,86 +15,45 @@ class Connection
      */
     public function getMessages(): array
     {
-        $message = "";
+        $messageString = "";
         while (true) {
             $chunk = stream_socket_recvfrom($this->conn, 1024, 0);
-            $message .= $chunk;
-            $len = strlen($message);
+            $messageString .= $chunk;
+            $len = strlen($messageString);
             if ($len === 0) {
                 break;
             }
-            if ($message[$len - 1] == "\0") {
+            if ($messageString[$len - 1] === "\0") {
                 break;
             }
         }
-        if ($this->debug) {
-            echo $message. PHP_EOL;
-        }
-        $messages = explode("\0", $message);
-        $ret = [];
-        foreach ($messages as $m) {
-            if (strpos($m, '<?xml') === 0) {
-                $ret[] = $m;
+        $messageStrings = explode("\0", $messageString);
+        $messages = [];
+        foreach ($messageStrings as $messageString) {
+            if (str_starts_with($messageString, '<?xml')) {
+                $message = Message::createFromXML($messageString);
+                if ($message !== null) {
+                    $messages[] = $message;
+                }
             }
         }
-        return $ret;
+        $responses = array_filter($messages, function(Message $message) {
+            return !$message->isSkipped();
+        });
+        if (count($responses) === 0) {
+            return array_merge($messages, $this->getMessages());
+        }
+        return $messages;
     }
 
     /**
-     * @param string $input
-     * @return string
+     * @param Command $command
      */
-    private function getCommand(string $input): string
+    public function sendCommand(Command $command)
     {
-        $args = preg_split('/\s+/', $input);
-        $command = $args[0];
-        if (in_array($command, ["n", "next"], true)) {
-            return "step_over -i $this->transaction_id";
-        }
-        if (in_array($command, ["c", "continue"], true)) {
-            return "run -i $this->transaction_id";
-        }
-        if (in_array($command, ["s", "step"], true)) {
-            return "step_into -i $this->transaction_id";
-        }
-        if (in_array($command, ["status"], true)) {
-            return "status -i $this->transaction_id";
-        }
-        if (in_array($command, ["source"], true)) {
-            return "source -i $this->transaction_id";
-        }
-        if (in_array($command, ["stdout"], true)) {
-            return "stdout -i $this->transaction_id -c 1";
-        }
-        if (in_array($command, ["breakpoint_set"], true)) {
-            $file = $args[1];
-            $lineno = $args[2];
-            return "breakpoint_set -i $this->transaction_id -t line -f $file -n $lineno";
-        }
-        if (in_array($command, ["breakpoint_get"], true)) {
-            $id = $args[1];
-            return "breakpoint_get -i $this->transaction_id -d $id";
-        }
-        if (in_array($command, ["breakpoint_list"], true)) {
-            return "breakpoint_list -i $this->transaction_id";
-        }
-        if (in_array($input, ["w", "whereami"], true)) {
-            return "";
-        }
-        $b64encoded = base64_encode($input);
-        return "eval -i $this->transaction_id -d 1 -- ${b64encoded}";
-    }
-
-    /**
-     * @param $conn
-     * @param string $input
-     */
-    public function sendCommand(string $input)
-    {
-        if ($input === '') {
+        if (!$command->isValid()) {
             return;
         }
-        $command = $this->getCommand($input);
         stream_socket_sendto($this->conn, "${command}\0");
         $this->transaction_id++;
     }
@@ -105,5 +61,14 @@ class Connection
     public function close()
     {
         fclose($this->conn);
+    }
+
+    /**
+     * @param string $input
+     * @return Command
+     */
+    public function getCommand(string $input): Command
+    {
+        return new Command($input, $this->transaction_id);
     }
 }

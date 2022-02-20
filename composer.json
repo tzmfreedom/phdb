@@ -6,7 +6,9 @@
             "email": "makoto_tajitsu@hotmail.co.jp"
         }
     ],
-    "require": {},
+    "require": {
+        "monolog/monolog": "^2.3"
+    },
     "autoload": {
         "psr-4": {
             "PHPSimpleDebugger\\": "src/"
