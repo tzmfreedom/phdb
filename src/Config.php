@@ -9,6 +9,8 @@ class Config
      */
     public array $initCommands = [];
 
+    public bool $autoStart = true;
+
     /**
      * @param string $file
      */
@@ -20,6 +22,9 @@ class Config
             $filename = $breakpoint['file'];
             $lineno = $breakpoint['lineno'];
             $this->initCommands[] = "breakpoint_set $filename $lineno";
+        }
+        if ($config['autoStart'] === false) {
+            $this->autoStart = false;
         }
     }
 }

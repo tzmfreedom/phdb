@@ -62,8 +62,10 @@ class Debugger
                 }
             }
 
-            if ($this->sendCommand($conn, 'continue')) {
-                $this->handleMessages($conn);
+            if ($this->config->autoStart) {
+                if ($this->sendCommand($conn, 'continue')) {
+                    $this->handleMessages($conn);
+                }
             }
 
             while(true) {
