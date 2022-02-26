@@ -3,7 +3,6 @@
 namespace PHPSimpleDebugger;
 
 use Monolog\Formatter\LineFormatter;
-use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use PHPSimpleDebugger\Message\Message;
@@ -52,18 +51,8 @@ class Debugger
             // handle init
             $this->handleMessages($conn);
 
-            if ($this->sendCommand($conn, 'stdout')) {
-                $this->handleMessages($conn);
-            }
-
             foreach ($this->config->initCommands as $command) {
                 if ($this->sendCommand($conn, $command)) {
-                    $this->handleMessages($conn);
-                }
-            }
-
-            if ($this->config->autoStart) {
-                if ($this->sendCommand($conn, 'continue')) {
                     $this->handleMessages($conn);
                 }
             }
@@ -72,6 +61,19 @@ class Debugger
                 $input = readline(">> ");
                 if ($input === "exit") {
                     throw new StoppingException();
+                }
+                if (in_array($input, ['h', "help"], true)) {
+                    echo 'next' .PHP_EOL;
+                    echo 'continue' .PHP_EOL;
+                    echo 'step' .PHP_EOL;
+                    echo 'status' .PHP_EOL;
+                    echo 'source' .PHP_EOL;
+                    echo 'whereami' .PHP_EOL;
+                    echo 'breakpoint_set' .PHP_EOL;
+                    echo 'local' .PHP_EOL;
+                    echo 'super_global' .PHP_EOL;
+                    echo 'constants' .PHP_EOL;
+                    continue;
                 }
                 if ($this->sendCommand($conn, $input)) {
                     $this->handleMessages($conn);

@@ -22,6 +22,9 @@ class Command
      */
     private function getCommandString(string $input, int $transaction_id): string
     {
+        if ($input === '') {
+            return '';
+        }
         $args = preg_split('/\s+/', $input);
         $command = $args[0];
         if (in_array($command, ["n", "next"], true)) {
@@ -55,10 +58,16 @@ class Command
             return "breakpoint_list -i $transaction_id";
         }
         if (in_array($command, ["w", "whereami"], true)) {
-            return "";
+            return "stack_get -i $transaction_id";
         }
-        if (in_array($command, ["context_get"], true)) {
-            return "context_get -i $transaction_id";
+        if (in_array($command, ["local"], true)) {
+            return "context_get -i $transaction_id -c 0";
+        }
+        if (in_array($command, ["super_global"], true)) {
+            return "context_get -i $transaction_id -c 1";
+        }
+        if (in_array($command, ["constants"], true)) {
+            return "context_get -i $transaction_id -c 2";
         }
         $b64encoded = base64_encode($input);
         return "eval -i $transaction_id -d 1 -- ${b64encoded}";

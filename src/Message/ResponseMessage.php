@@ -2,15 +2,21 @@
 
 namespace PHPSimpleDebugger\Message;
 
+use LucidFrame\Console\ConsoleTable;
+
 class ResponseMessage extends Message
 {
-    public array $property;
-    public string $filename;
-    public string $lineno;
+    public string $filename = '';
+    public string $lineno = '';
     public string $status = '';
     public string $command = '';
     public string $transaction_id = '';
-    public string $body = '';
+    public string $value = '';
+    public array $stacks = [];
+    /**
+     * @var Property[]
+     */
+    public array $properties = [];
 
     /**
      * @param string $message
@@ -19,59 +25,84 @@ class ResponseMessage extends Message
     {
         $dom = new \DOMDocument();
         $dom->loadXML($message);
-        $responses = $dom->getElementsByTagName('response');
-        if ($responses->length !== 0) {
-            foreach ($responses[0]->attributes as $attribute) {
-                switch ($attribute->name) {
-                    case 'status':
-                        $this->status = $attribute->value;
+        $response = $dom->firstElementChild;
+        $this->status = $response->getAttribute('status');
+        $this->transaction_id = $response->getAttribute('transaction_id');
+        $this->command = $response->getAttribute('command');
+
+        switch ($this->command) {
+            case 'eval':
+            case 'context_get':
+                foreach ($response->childNodes as $node) {
+                    switch ($node->tagName) {
+                        case 'property':
+                            $property = $node;
+                            $encoding = $property->getAttribute('encoding');
+                            $type = $property->getAttribute('type');
+                            $size = $property->getAttribute('size');
+                            $fullname = $property->getAttribute('fullname');
+                            $name = $property->getAttribute('name');
+                            $facet = $property->getAttribute('facet');
+                            $classname = $property->getAttribute('classname');
+                            $value = $property->nodeValue;
+                            if ($encoding === 'base64') {
+                                $value = base64_decode($value);
+                            }
+                            if ($type === 'object' || $type === 'array') {
+                                $subProperties = [];
+                                foreach ($property->getElementsByTagName("property") as $subProperty) {
+                                    $subValue = $subProperty->nodeValue;
+                                    if ($subProperty->getAttribute('encoding') === 'base64') {
+                                        $subValue = base64_decode($subValue);
+                                    }
+                                    $subProperties[] = new Property(
+                                        $subProperty->getAttribute('name'),
+                                        $subProperty->getAttribute('fullname'),
+                                        $subProperty->getAttribute('type'),
+                                        $subProperty->getAttribute('size'),
+                                        $subProperty->getAttribute('facet'),
+                                        $subValue,
+                                        [],
+                                        $subProperty->getAttribute('classname')
+                                    );
+                                }
+                                $this->properties[] = new Property($name, $fullname, $type, $size, $facet, $value, $subProperties, $classname);
+                            } else {
+                                $this->properties[] = new Property($name, $fullname, $type, $size, $facet, $value, [], $classname);
+                            }
                         break;
-                    case 'transaction_id':
-                        $this->transaction_id = $attribute->value;
-                        break;
-                    case 'command':
-                        $this->command = $attribute->value;
-                        break;
-                }
-            }
-            if ($this->command === 'eval') {
-                $properties = [];
-                $property = $dom->getElementsByTagName("property");
-                if ($property->length != 0) {
-                    foreach ($property[0]->attributes as $attribute) {
-                        $properties[$attribute->name] = $attribute->value;
-                    }
-                    if (isset($properties['encoding']) && $properties['encoding'] === 'base64') {
-                        $properties['body'] = base64_decode($property[0]->nodeValue);
-                    } else if ($properties['type'] === 'object') {
-                        $properties['body'] = "<" . $properties['classname'] . ">";
-                    } else {
-                        $properties['body'] = $property[0]->nodeValue;
-                    }
-                    $this->property = $properties;
-                }
-                $messages = $dom->getElementsByTagName("message");
-                if ($messages->length !== 0) {
-                    $this->body = $messages[0]->nodeValue;
-                }
-            }
-            $messages = $dom->getElementsByTagName("message");
-            if ($messages->length !== 0) {
-                $lineno = '';
-                $filename = '';
-                foreach ($messages[0]->attributes as $attribute) {
-                    switch ($attribute->name) {
-                        case 'lineno':
-                            $lineno = $attribute->value;
+                        case 'message':
+                        case 'error':
+                            $this->value = $node->nodeValue;
                             break;
-                        case 'filename':
-                            $filename = $attribute->value;
-                            break;
                     }
                 }
-                $this->lineno = $lineno;
-                $this->filename = $filename;
-            }
+                break;
+            case 'run':
+            case 'step_over':
+            case 'step_into':
+            case 'step_out':
+                $messageTag = $response->firstElementChild;
+                $this->lineno = $messageTag->getAttribute('lineno');
+                $this->filename = $messageTag->getAttribute('filename');
+                break;
+            case 'stack_get':
+                foreach ($response->childNodes as $stack) {
+                    if ($stack->tagName !== 'stack') {
+                        continue;
+                    }
+                    $this->stacks[] = new Stack(
+                        $stack->getAttribute('where'),
+                        $stack->getAttribute('level'),
+                        $stack->getAttribute('filename'),
+                        $stack->getAttribute('lineno'),
+                    );
+                }
+                if (count($this->stacks) > 0) {
+                    $this->lineno = $this->stacks[0]->lineno;
+                    $this->filename = $this->stacks[0]->filename;
+                }
+                break;
         }
         parent::__construct($message);
     }
@@ -89,14 +120,68 @@ class ResponseMessage extends Message
      */
     public function format(): string
     {
-        if (isset($this->property)) {
-            return var_export($this->property, true);
-        }
-        if (!empty($this->lineno) && !empty($this->filename)) {
-            return "$this->filename at $this->lineno\n" . $this->showFile();
-        }
-        if (isset($this->body)) {
-            return $this->body;
+        switch ($this->command) {
+            case 'stack_get':
+                return implode(PHP_EOL, array_map(function(Stack $stack) {
+                    return "{$stack->filename}:{$stack->lineno}, {$stack->where}()";
+                }, $this->stacks)) . PHP_EOL . PHP_EOL . $this->showFile();
+            case 'eval':
+                if ($this->value !== '') {
+                    return $this->value;
+                }
+                $table = new ConsoleTable();
+                $table
+                    ->addHeader('type')
+                    ->addHeader('value');
+                foreach ($this->properties as $property) {
+                    if ($property->type === 'object' || $property->type === 'array') {
+                        $body = implode(', ', array_map(function(Property $property) {
+                            $value = preg_replace("/\e/", '', $property->value);
+                            return "$property->name => $value";
+                        }, $property->properties));
+                        if (mb_strlen($body) > 100) {
+                            $body = mb_substr($body, 0, 100) . '...';
+                        }
+                        $table->addRow([$property->classname, $body]);
+                    } else {
+                        $size = '';
+                        if ($property->size !== '') {
+                            $size = "({$property->size})";
+                        }
+                        $table->addRow(["{$property->type}$size", $property->value]);
+                    }
+                }
+                return $table->getTable();
+            case 'context_get':
+                $table = new ConsoleTable();
+                $table
+                    ->addHeader('name')
+                    ->addHeader('type')
+                    ->addHeader('value');
+                foreach ($this->properties as $property) {
+                    if ($property->type === 'object' || $property->type === 'array') {
+                        $body = implode(PHP_EOL, array_map(function(Property $property) {
+                            $value = preg_replace("/\e/", '', $property->value);
+                            return "$property->name => $value";
+                        }, $property->properties));
+                        if (mb_strlen($body) > 100) {
+                            $body = mb_substr($body, 0, 100) . '...';
+                        }
+                        $table->addRow([$property->name, $property->classname, $body]);
+                    } else {
+                        $size = '';
+                        if ($property->size !== '') {
+                            $size = "({$property->size})";
+                        }
+                        $table->addRow([$property->name, "{$property->type}$size", $property->value]);
+                    }
+                }
+                return $table->getTable();
+            case 'run':
+            case 'step_over':
+            case 'step_into':
+            case 'step_out':
+                return "$this->filename at $this->lineno\n" . $this->showFile();
         }
         return '';
     }

@@ -47,18 +47,12 @@ abstract class Message
     {
         $dom = new \DOMDocument();
         $dom->loadXML($message);
-        $init = $dom->getElementsByTagName("init");
-        if ($init->length != 0) {
-            return 'init';
-        }
-        $stream = $dom->getElementsByTagName('stream');
-        if ($stream->length !== 0) {
-            return 'stream';
-        }
-        $response = $dom->getElementsByTagName("response");
-        if ($response->length !== 0) {
-            return 'response';
-        }
-        return '';
+        $rootTagName = $dom->firstElementChild->tagName;
+        return match ($rootTagName) {
+            'init' => 'init',
+            'stream' => 'stream',
+            'response' => 'response',
+            default => '',
+        };
     }
 }
