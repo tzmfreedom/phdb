@@ -95,10 +95,7 @@ class Debugger
         if ($message->isStopping()) {
             throw new StoppingException();
         }
-        $output = $message->format();
-        if (!empty($output)) {
-            echo $output . PHP_EOL;
-        }
+        (new ConsoleView($this->config))->render($message);
     }
 
     /**

@@ -37,17 +37,6 @@ class StreamMessage extends Message
     }
 
     /**
-     * @return string
-     */
-    public function format(): string
-    {
-        if ($this->encoding === 'base64') {
-            return base64_decode($this->body);
-        }
-        return $this->body;
-    }
-
-    /**
      * @return bool
      */
     public function isSkipped(): bool

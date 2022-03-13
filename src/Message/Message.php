@@ -4,8 +4,6 @@ namespace PHPSimpleDebugger\Message;
 
 abstract class Message
 {
-    public abstract function format(): string;
-
     public abstract function isSkipped(): bool;
 
     public abstract function isStopping(): bool;

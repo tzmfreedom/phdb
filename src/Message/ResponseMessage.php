@@ -2,8 +2,6 @@
 
 namespace PHPSimpleDebugger\Message;
 
-use LucidFrame\Console\ConsoleTable;
-
 class ResponseMessage extends Message
 {
     public string $filename = '';
@@ -12,6 +10,9 @@ class ResponseMessage extends Message
     public string $command = '';
     public string $transaction_id = '';
     public string $value = '';
+    /**
+     * @var Stack[]
+     */
     public array $stacks = [];
     /**
      * @var Property[]
@@ -116,115 +117,10 @@ class ResponseMessage extends Message
     }
 
     /**
-     * @return string
-     */
-    public function format(): string
-    {
-        switch ($this->command) {
-            case 'stack_get':
-                return implode(PHP_EOL, array_map(function(Stack $stack) {
-                    return "{$stack->filename}:{$stack->lineno}, {$stack->where}()";
-                }, $this->stacks)) . PHP_EOL . PHP_EOL . $this->showFile();
-            case 'eval':
-                if ($this->value !== '') {
-                    return $this->value;
-                }
-                $table = new ConsoleTable();
-                $table
-                    ->addHeader('type')
-                    ->addHeader('value');
-                foreach ($this->properties as $property) {
-                    if ($property->type === 'object' || $property->type === 'array') {
-                        $body = implode(', ', array_map(function(Property $property) {
-                            $value = preg_replace("/\e/", '', $property->value);
-                            return "$property->name => $value";
-                        }, $property->properties));
-                        if (mb_strlen($body) > 100) {
-                            $body = mb_substr($body, 0, 100) . '...';
-                        }
-                        $table->addRow([$property->classname, $body]);
-                    } else {
-                        $size = '';
-                        if ($property->size !== '') {
-                            $size = "({$property->size})";
-                        }
-                        $table->addRow(["{$property->type}$size", $property->value]);
-                    }
-                }
-                return $table->getTable();
-            case 'context_get':
-                $table = new ConsoleTable();
-                $table
-                    ->addHeader('name')
-                    ->addHeader('type')
-                    ->addHeader('value');
-                foreach ($this->properties as $property) {
-                    if ($property->type === 'object' || $property->type === 'array') {
-                        $body = implode(PHP_EOL, array_map(function(Property $property) {
-                            $value = preg_replace("/\e/", '', $property->value);
-                            return "$property->name => $value";
-                        }, $property->properties));
-                        if (mb_strlen($body) > 100) {
-                            $body = mb_substr($body, 0, 100) . '...';
-                        }
-                        $table->addRow([$property->name, $property->classname, $body]);
-                    } else {
-                        $size = '';
-                        if ($property->size !== '') {
-                            $size = "({$property->size})";
-                        }
-                        $table->addRow([$property->name, "{$property->type}$size", $property->value]);
-                    }
-                }
-                return $table->getTable();
-            case 'run':
-            case 'step_over':
-            case 'step_into':
-            case 'step_out':
-                return "$this->filename at $this->lineno\n" . $this->showFile();
-        }
-        return '';
-    }
-
-    /**
      * @return bool
      */
     public function isStopping(): bool
     {
         return $this->status === 'stopping';
-    }
-
-    /**
-     * @return string
-     */
-    private function showFile(): string
-    {
-        $lineno = (int)$this->lineno;
-
-        $fp = fopen($this->filename, 'r');
-        $size = 15;
-        $current = 0;
-        $cnt = $lineno < 8 ? 0 : $lineno - 8;
-        for ($i = 0; $i < $cnt; $i++) {
-            fgets($fp);
-            $current++;
-        }
-        $max = $lineno + 7;
-        $width = strlen((string)$max);
-        $lines = [];
-        for ($i = 0; $i < $size; $i++) {
-            $line = fgets($fp);
-            $current++;
-            if ($line) {
-                $formatLine = sprintf("%0{$width}d", $current);
-                if ($current === $lineno) {
-                    $lines[] = ">> $formatLine: $line";
-                } else {
-                    $lines[] = "   $formatLine: $line";
-                }
-            }
-        }
-        fclose($fp);
-        return implode('', $lines);
     }
 }

@@ -13,14 +13,6 @@ class InitMessage extends Message
     }
 
     /**
-     * @return string
-     */
-    public function format(): string
-    {
-        return '';
-    }
-
-    /**
      * @return bool
      */
     public function isStopping(): bool
