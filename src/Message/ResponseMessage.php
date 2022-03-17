@@ -83,6 +83,9 @@ class ResponseMessage extends Message
             case 'step_over':
             case 'step_into':
             case 'step_out':
+                if ($this->isStopping()) {
+                    break;
+                }
                 $messageTag = $response->firstElementChild;
                 $this->lineno = $messageTag->getAttribute('lineno');
                 $this->filename = $messageTag->getAttribute('filename');

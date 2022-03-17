@@ -5,7 +5,9 @@ namespace PHPSimpleDebugger;
 use LucidFrame\Console\ConsoleTable;
 use PHPSimpleDebugger\Message\InitMessage;
 use PHPSimpleDebugger\Message\Message;
+use PHPSimpleDebugger\Message\Property;
 use PHPSimpleDebugger\Message\ResponseMessage;
+use PHPSimpleDebugger\Message\Stack;
 use PHPSimpleDebugger\Message\StreamMessage;
 
 class ConsoleView
@@ -31,11 +33,10 @@ class ConsoleView
             return '';
         }
         if ($message::class === StreamMessage::class) {
-            if ($message->encoding === 'base64') {
-                return base64_decode($message->body);
-            }
-            return $message->body;
+            /** @var $message StreamMessage */
+            return $message->getBody();
         }
+        /** @var $message ResponseMessage */
         switch ($message->command) {
             case 'stack_get':
                 return implode(PHP_EOL, array_map(function(Stack $stack) {
@@ -54,6 +55,18 @@ class ConsoleView
                     if ($property->type === 'object' || $property->type === 'array') {
                         $body = implode(', ', array_map(function(Property $property) {
                             $value = preg_replace("/\e/", '', $property->value);
+                            if ($property->type === 'object') {
+                                $value = "{$property->classname}()";
+                            }
+                            if ($property->type === 'string' && $property->value === '') {
+                                $value = '""';
+                            }
+                            if ($property->type === 'null') {
+                                $value = 'null';
+                            }
+                            if ($property->type === 'array') {
+                                $value = 'array()';
+                            }
                             return "$property->name => $value";
                         }, $property->properties));
                         if (mb_strlen($body) > 100) {
@@ -77,8 +90,20 @@ class ConsoleView
                     ->addHeader('value');
                 foreach ($message->properties as $property) {
                     if ($property->type === 'object' || $property->type === 'array') {
-                        $body = implode(PHP_EOL, array_map(function(Property $property) {
+                        $body = implode('; ', array_map(function(Property $property) {
                             $value = preg_replace("/\e/", '', $property->value);
+                            if ($property->type === 'object') {
+                                $value = "{$property->classname}()";
+                            }
+                            if ($property->type === 'string' && $property->value === '') {
+                                $value = '""';
+                            }
+                            if ($property->type === 'null') {
+                                $value = 'null';
+                            }
+                            if ($property->type === 'array') {
+                                $value = 'array()';
+                            }
                             return "$property->name => $value";
                         }, $property->properties));
                         if (mb_strlen($body) > 100) {
@@ -127,11 +152,13 @@ class ConsoleView
         $lines = [];
         for ($i = 0; $i < $size; $i++) {
             $line = fgets($fp);
+//            $line = str_replace('echo ', "\e[0;35mecho \e[0m", $line);
             $current++;
             if ($line) {
                 $formatLine = sprintf("%0{$width}d", $current);
+                $formatLine = "\e[01;34m{$formatLine}\e[0m";
                 if ($current === $lineno) {
-                    $lines[] = ">> $formatLine: $line";
+                    $lines[] = "=> $formatLine: $line";
                 } else {
                     $lines[] = "   $formatLine: $line";
                 }

@@ -36,6 +36,9 @@ class Command
         if (in_array($command, ["s", "step"], true)) {
             return "step_into -i $transaction_id";
         }
+        if (in_array($command, ["f", "finish"], true)) {
+            return "step_out -i $transaction_id";
+        }
         if (in_array($command, ["status"], true)) {
             return "status -i $transaction_id";
         }

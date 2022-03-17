@@ -51,4 +51,15 @@ class StreamMessage extends Message
     {
         return false;
     }
+
+    /**
+     * @return string
+     */
+    public function getBody(): string
+    {
+        if ($this->encoding === 'base64') {
+            return base64_decode($this->body);
+        }
+        return $this->body;
+    }
 }

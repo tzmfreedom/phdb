@@ -76,6 +76,7 @@ class Debugger
                     continue;
                 }
                 if ($this->sendCommand($conn, $input)) {
+                    readline_add_history($input);
                     $this->handleMessages($conn);
                 }
             }
