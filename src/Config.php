@@ -14,6 +14,9 @@ class Config
      */
     public function __construct(string $file)
     {
+        if ($file === '') {
+            return;
+        }
         $content = file_get_contents($file);
         if ($content !== false) {
             $config = json_decode($content, true);
