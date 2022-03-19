@@ -1,0 +1,9 @@
+{
+  "breakpoints": [
+    {
+      "file": "/path/to/main.php",
+      "lineno": 14
+    }
+  ],
+  "autoStart": true
+}

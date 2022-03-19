@@ -1,9 +1,0 @@
-{
-  "breakpoints": [
-    {
-      "file": "/Users/makoto.tajitsu/dev/src/github.com/tzmfreedom/php-sample/debugger/index.php",
-      "lineno": "14"
-    }
-  ],
-  "autoStart": true
-}
