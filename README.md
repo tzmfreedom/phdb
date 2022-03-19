@@ -9,7 +9,7 @@ PHP: >= 8.0
 ### Usage
 
 ```bash
-$ composer install -g tzmfreedom/phdb
+$ composer global require tzmfreedom/phdb
 ```
 
 ```bash
