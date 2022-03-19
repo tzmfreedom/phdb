@@ -6,13 +6,13 @@ use PHPSimpleDebugger\Message\Message;
 
 class Connection
 {
-    private int $transaction_id;
+    private int $transactionID;
 
     /**
      * @param $conn
      */
     function __construct(public $conn) {
-        $this->transaction_id = 1;
+        $this->transactionID = 1;
     }
 
     /**
@@ -61,7 +61,7 @@ class Connection
             return false;
         }
         stream_socket_sendto($this->conn, "${command}\0");
-        $this->transaction_id++;
+        $this->transactionID++;
         return true;
     }
 
@@ -76,6 +76,6 @@ class Connection
      */
     public function getCommand(string $input): Command
     {
-        return new Command($input, $this->transaction_id);
+        return new Command($input, $this->transactionID);
     }
 }

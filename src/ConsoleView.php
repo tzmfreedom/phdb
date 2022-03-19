@@ -3,6 +3,7 @@
 namespace PHPSimpleDebugger;
 
 use LucidFrame\Console\ConsoleTable;
+use PHPSimpleDebugger\Message\Breakpoint;
 use PHPSimpleDebugger\Message\InitMessage;
 use PHPSimpleDebugger\Message\Message;
 use PHPSimpleDebugger\Message\Property;
@@ -130,6 +131,12 @@ class ConsoleView
                 return "$filename at $message->lineno\n" . $this->showFile($message);
             case 'source':
                 return $message->value;
+            case 'breakpoint_set':
+                return "breakpoint_id: $message->breakpointID" . PHP_EOL;
+            case 'breakpoint_list':
+                return implode(PHP_EOL, array_map(function(Breakpoint $breakpoint) {
+                        return "{$breakpoint->id}: {$breakpoint->filename}:{$breakpoint->lineno}";
+                    }, $message->breakpoints)) . PHP_EOL;
         }
         return '';
     }

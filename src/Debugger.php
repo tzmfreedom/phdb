@@ -11,7 +11,7 @@ use PHPSimpleDebugger\Message\ResponseMessage;
 class Debugger
 {
     private Logger $logger;
-    private ResponseMessage $lastSourceMessage;
+    private ?ResponseMessage $lastSourceMessage = null;
 
     /**
      * @param Config $config
@@ -137,8 +137,10 @@ class Debugger
             // TODO
             return true;
         }
-        if (in_array($input, ['current'], true)) {
-            (new ConsoleView($this->config))->render($this->lastSourceMessage);
+        if (in_array($input, ['list'], true)) {
+            if (!is_null($this->lastSourceMessage)) {
+                (new ConsoleView($this->config))->render($this->lastSourceMessage);
+            }
             return true;
         }
         return false;

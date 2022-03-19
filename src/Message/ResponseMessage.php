@@ -8,8 +8,10 @@ class ResponseMessage extends Message
     public string $lineno = '';
     public string $status = '';
     public string $command = '';
-    public string $transaction_id = '';
+    public string $transactionID = '';
     public string $value = '';
+    public string $breakpointID = '';
+
     /**
      * @var Stack[]
      */
@@ -18,6 +20,10 @@ class ResponseMessage extends Message
      * @var Property[]
      */
     public array $properties = [];
+    /**
+     * @var Breakpoint[]
+     */
+    public array $breakpoints = [];
 
     /**
      * @param string $message
@@ -28,12 +34,27 @@ class ResponseMessage extends Message
         $dom->loadXML($message);
         $response = $dom->firstElementChild;
         $this->status = $response->getAttribute('status');
-        $this->transaction_id = $response->getAttribute('transaction_id');
+        $this->transactionID = $response->getAttribute('transaction_id');
         $this->command = $response->getAttribute('command');
 
         switch ($this->command) {
             case 'source':
                 $this->value = base64_decode($response->nodeValue);
+                break;
+            case 'breakpoint_set':
+                $this->breakpointID = $response->getAttribute('id');
+                break;
+            case 'breakpoint_list':
+                foreach ($response->childNodes as $breakpoint) {
+                    if ($breakpoint->tagName !== 'breakpoint') {
+                        continue;
+                    }
+                    $this->breakpoints[] = new Breakpoint(
+                        $breakpoint->getAttribute('id'),
+                        $breakpoint->getAttribute('filename'),
+                        $breakpoint->getAttribute('lineno'),
+                    );
+                }
                 break;
             case 'eval':
             case 'context_get':
