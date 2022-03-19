@@ -39,9 +39,9 @@ class Command
         if (in_array($command, ["f", "finish"], true)) {
             return "step_out -i $transaction_id";
         }
-        if (in_array($command, ["status"], true)) {
-            return "status -i $transaction_id";
-        }
+//        if (in_array($command, ["status"], true)) {
+//            return "status -i $transaction_id";
+//        }
         if (in_array($command, ["source"], true)) {
             return "source -i $transaction_id";
         }
@@ -60,16 +60,16 @@ class Command
         if (in_array($command, ["breakpoint_list"], true)) {
             return "breakpoint_list -i $transaction_id";
         }
-        if (in_array($command, ["w", "whereami"], true)) {
+        if (in_array($command, ["bt", "backtrace"], true)) {
             return "stack_get -i $transaction_id";
         }
-        if (in_array($command, ["local"], true)) {
+        if (in_array($command, ["l", "local"], true)) {
             return "context_get -i $transaction_id -c 0";
         }
-        if (in_array($command, ["super_global"], true)) {
+        if (in_array($command, ["sg", "super_global"], true)) {
             return "context_get -i $transaction_id -c 1";
         }
-        if (in_array($command, ["constants"], true)) {
+        if (in_array($command, ["cn", "constants"], true)) {
             return "context_get -i $transaction_id -c 2";
         }
         $b64encoded = base64_encode($input);

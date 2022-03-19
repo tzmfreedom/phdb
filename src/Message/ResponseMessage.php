@@ -32,6 +32,9 @@ class ResponseMessage extends Message
         $this->command = $response->getAttribute('command');
 
         switch ($this->command) {
+            case 'source':
+                $this->value = base64_decode($response->nodeValue);
+                break;
             case 'eval':
             case 'context_get':
                 foreach ($response->childNodes as $node) {

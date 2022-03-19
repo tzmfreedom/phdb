@@ -12,6 +12,8 @@ use PHPSimpleDebugger\Message\StreamMessage;
 
 class ConsoleView
 {
+    const MAX_LENGTH = 50;
+
     public function __construct(public Config $config)
     {}
 
@@ -41,8 +43,9 @@ class ConsoleView
             case 'stack_get':
                 return implode(PHP_EOL, array_map(function(Stack $stack) {
                         $filename = $this->getFilename($stack->filename);
-                        return "{$filename}:{$stack->lineno}, {$stack->where}()";
-                    }, $message->stacks)) . PHP_EOL . PHP_EOL . $this->showFile($message);
+                        $level = "\e[01;34m{$stack->level}\e[0m";
+                        return "{$level}: {$filename}:{$stack->lineno}, {$stack->where}()";
+                    }, $message->stacks)) . PHP_EOL;
             case 'eval':
                 if ($message->value !== '') {
                     return $message->value;
@@ -69,8 +72,8 @@ class ConsoleView
                             }
                             return "$property->name => $value";
                         }, $property->properties));
-                        if (mb_strlen($body) > 100) {
-                            $body = mb_substr($body, 0, 100) . '...';
+                        if (mb_strlen($body) > self::MAX_LENGTH) {
+                            $body = mb_substr($body, 0, self::MAX_LENGTH) . '...';
                         }
                         $table->addRow([$property->classname, $body]);
                     } else {
@@ -106,8 +109,8 @@ class ConsoleView
                             }
                             return "$property->name => $value";
                         }, $property->properties));
-                        if (mb_strlen($body) > 100) {
-                            $body = mb_substr($body, 0, 100) . '...';
+                        if (mb_strlen($body) > self::MAX_LENGTH) {
+                            $body = mb_substr($body, 0, self::MAX_LENGTH) . '...';
                         }
                         $table->addRow([$property->name, $property->classname, $body]);
                     } else {
@@ -125,6 +128,8 @@ class ConsoleView
             case 'step_out':
                 $filename= $this->getFilename($message->filename);
                 return "$filename at $message->lineno\n" . $this->showFile($message);
+            case 'source':
+                return $message->value;
         }
         return '';
     }
@@ -174,8 +179,6 @@ class ConsoleView
      */
     private function getFilename(string $filename)
     {
-        $remote = $this->config->fileMapping['remote'];
-        $local = $this->config->fileMapping['local'];
         if (isset($local) && isset($remote)) {
             return str_replace($remote, $local, $filename);
         }

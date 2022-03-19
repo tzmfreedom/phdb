@@ -5,7 +5,7 @@ namespace PHPSimpleDebugger;
 class Config
 {
     /**
-     * @var array<string>
+     * @var string[]
      */
     public array $initCommands = [];
 
