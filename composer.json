@@ -1,12 +1,18 @@
 {
-    "name": "makoto.tajitsu/php_simple_debugger",
+    "name": "tzmfreedom/phdb",
     "authors": [
         {
             "name": "tzmfreedom",
             "email": "makoto_tajitsu@hotmail.co.jp"
         }
     ],
+    "description": "Simple PHP Debugger written in PHP",
+    "homepage": "https://github.com/tzmfreedom/phdb",
+    "license": "MIT",
+    "bin": ["bin/phdb"],
+    "version": "0.0.1",
     "require": {
+        "php" : ">=8.0",
         "monolog/monolog": "^2.3",
         "phplucidframe/console-table": "^1.2",
         "ext-readline": "*",
