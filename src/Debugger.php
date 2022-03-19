@@ -6,10 +6,12 @@ use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use PHPSimpleDebugger\Message\Message;
+use PHPSimpleDebugger\Message\ResponseMessage;
 
 class Debugger
 {
     private Logger $logger;
+    private ResponseMessage $lastSourceMessage;
 
     /**
      * @param Config $config
@@ -59,20 +61,10 @@ class Debugger
 
             while(true) {
                 $input = readline(">> ");
-                if ($input === "exit") {
-                    throw new StoppingException();
+                if ($input === false) {
+                    continue;
                 }
-                if (in_array($input, ['h', "help"], true)) {
-                    echo 'next' .PHP_EOL;
-                    echo 'continue' .PHP_EOL;
-                    echo 'step' .PHP_EOL;
-                    echo 'status' .PHP_EOL;
-                    echo 'source' .PHP_EOL;
-                    echo 'whereami' .PHP_EOL;
-                    echo 'breakpoint_set' .PHP_EOL;
-                    echo 'local' .PHP_EOL;
-                    echo 'super_global' .PHP_EOL;
-                    echo 'constants' .PHP_EOL;
+                if ($this->handleWithoutConnection($input)) {
                     continue;
                 }
                 if ($this->sendCommand($conn, $input)) {
@@ -95,6 +87,11 @@ class Debugger
     {
         if ($message->isStopping()) {
             throw new StoppingException();
+        }
+        if ($message instanceof ResponseMessage) {
+            if ($message->lineno !== '') {
+                $this->lastSourceMessage = $message;
+            }
         }
         (new ConsoleView($this->config))->render($message);
     }
@@ -124,6 +121,27 @@ class Debugger
         foreach ($messages as $message) {
             $this->handleMessage($message);
         }
+    }
+
+    /**
+     * @param string $input
+     * @return bool
+     * @throws StoppingException
+     */
+    private function handleWithoutConnection(string $input): bool
+    {
+        if ($input === "exit") {
+            throw new StoppingException();
+        }
+        if (in_array($input, ['h', "help"], true)) {
+            // TODO
+            return true;
+        }
+        if (in_array($input, ['current'], true)) {
+            (new ConsoleView($this->config))->render($this->lastSourceMessage);
+            return true;
+        }
+        return false;
     }
 }
 
