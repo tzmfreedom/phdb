@@ -45,7 +45,7 @@ class Connection
         $responses = array_filter($messages, function(Message $message) {
             return !$message->isSkipped();
         });
-        if (count($responses) === 0) {
+        if (count($messages) > 0 && count($responses) === 0) {
             return array_merge($messages, $this->getMessages());
         }
         return $messages;
