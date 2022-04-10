@@ -15,6 +15,7 @@ class Config
     public function __construct(string $file)
     {
         if ($file === '') {
+            $this->initCommands[] = 'continue';
             return;
         }
         $content = file_get_contents($file);
@@ -25,9 +26,7 @@ class Config
                 $lineno = $breakpoint['lineno'];
                 $this->initCommands[] = "breakpoint_set $filename $lineno";
             }
-            if (isset($config['autoStart']) && $config['autoStart'] === true) {
-                $this->initCommands[] = 'continue';
-            }
+            $this->initCommands[] = 'continue';
         }
     }
 }
